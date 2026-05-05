@@ -31,3 +31,6 @@ The current architecture now has a blockwise archive layer that can:
 
 ## Paper PDF
 - `file 'build/main.pdf'`
+
+## Model store
+- `CompressedModelStore` keeps model files compressed on disk and materialises them on demand.

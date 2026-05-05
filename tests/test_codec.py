@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from middleout_lattice import compress_directory, decompress_directory, compress_file_bytes, decompress_file_bytes
+from middleout_lattice import CompressedModelStore, compress_directory, decompress_directory, compress_file_bytes, decompress_file_bytes
 from middleout_lattice.codec import compress_bytes, decompress_bytes, roundtrip_path
 
 
@@ -27,3 +27,16 @@ def test_archive_roundtrip(tmp_path: Path):
     restored = decompress_directory(manifest, tmp_path / 'restored')
     assert (restored / 'a.txt').read_text() == (src_dir / 'a.txt').read_text()
     assert (restored / 'b.bin').read_bytes() == (src_dir / 'b.bin').read_bytes()
+
+
+def test_model_store_roundtrip(tmp_path: Path):
+    src_dir = tmp_path / 'src2'
+    src_dir.mkdir()
+    (src_dir / 'config.json').write_text('{"a": 1, "b": 2}')
+    (src_dir / 'weights.bin').write_bytes((b'abcd' * 1000) + b'\x00' * 2048)
+    store = CompressedModelStore.from_source(src_dir, tmp_path / 'packed2', block_size=256)
+    assert store.read_bytes('config.json') == (src_dir / 'config.json').read_bytes()
+    assert store.read_bytes('weights.bin') == (src_dir / 'weights.bin').read_bytes()
+    with store.open_materialized() as mat:
+        assert (mat / 'config.json').read_bytes() == (src_dir / 'config.json').read_bytes()
+        assert (mat / 'weights.bin').read_bytes() == (src_dir / 'weights.bin').read_bytes()

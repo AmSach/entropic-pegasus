@@ -2,145 +2,193 @@
   {
     "file": "config.json",
     "codec": "zlib",
-    "original_bytes": "681",
-    "compressed_bytes": "475",
-    "ratio": "1.4337",
-    "roundtrip_ok": "True"
+    "original_bytes": 681,
+    "compressed_bytes": 475,
+    "ratio": 1.4337,
+    "roundtrip_ok": true
+  },
+  {
+    "file": "config.json",
+    "codec": "zlib",
+    "original_bytes": 681,
+    "compressed_bytes": 475,
+    "ratio": 1.4337,
+    "roundtrip_ok": true
   },
   {
     "file": "config.json",
     "codec": "bz2",
-    "original_bytes": "681",
-    "compressed_bytes": "518",
-    "ratio": "1.3147",
-    "roundtrip_ok": "True"
+    "original_bytes": 681,
+    "compressed_bytes": 518,
+    "ratio": 1.3147,
+    "roundtrip_ok": true
   },
   {
     "file": "config.json",
     "codec": "lzma",
-    "original_bytes": "681",
-    "compressed_bytes": "549",
-    "ratio": "1.2404",
-    "roundtrip_ok": "True"
+    "original_bytes": 681,
+    "compressed_bytes": 549,
+    "ratio": 1.2404,
+    "roundtrip_ok": true
   },
   {
     "file": "generation_config.json",
     "codec": "zlib",
-    "original_bytes": "138",
-    "compressed_bytes": "227",
-    "ratio": "0.6079",
-    "roundtrip_ok": "True"
+    "original_bytes": 138,
+    "compressed_bytes": 227,
+    "ratio": 0.6079,
+    "roundtrip_ok": true
+  },
+  {
+    "file": "generation_config.json",
+    "codec": "zlib",
+    "original_bytes": 138,
+    "compressed_bytes": 227,
+    "ratio": 0.6079,
+    "roundtrip_ok": true
   },
   {
     "file": "generation_config.json",
     "codec": "bz2",
-    "original_bytes": "138",
-    "compressed_bytes": "256",
-    "ratio": "0.5391",
-    "roundtrip_ok": "True"
+    "original_bytes": 138,
+    "compressed_bytes": 256,
+    "ratio": 0.5391,
+    "roundtrip_ok": true
   },
   {
     "file": "generation_config.json",
     "codec": "lzma",
-    "original_bytes": "138",
-    "compressed_bytes": "285",
-    "ratio": "0.4842",
-    "roundtrip_ok": "True"
+    "original_bytes": 138,
+    "compressed_bytes": 285,
+    "ratio": 0.4842,
+    "roundtrip_ok": true
   },
   {
     "file": "merges.txt",
     "codec": "bz2",
-    "original_bytes": "1671839",
-    "compressed_bytes": "525417",
-    "ratio": "3.1819",
-    "roundtrip_ok": "True"
+    "original_bytes": 1671839,
+    "compressed_bytes": 525417,
+    "ratio": 3.1819,
+    "roundtrip_ok": true
+  },
+  {
+    "file": "merges.txt",
+    "codec": "bz2",
+    "original_bytes": 1671839,
+    "compressed_bytes": 525417,
+    "ratio": 3.1819,
+    "roundtrip_ok": true
   },
   {
     "file": "merges.txt",
     "codec": "lzma",
-    "original_bytes": "1671839",
-    "compressed_bytes": "577429",
-    "ratio": "2.8953",
-    "roundtrip_ok": "True"
+    "original_bytes": 1671839,
+    "compressed_bytes": 577429,
+    "ratio": 2.8953,
+    "roundtrip_ok": true
   },
   {
     "file": "merges.txt",
     "codec": "zlib",
-    "original_bytes": "1671839",
-    "compressed_bytes": "704654",
-    "ratio": "2.3726",
-    "roundtrip_ok": "True"
+    "original_bytes": 1671839,
+    "compressed_bytes": 704654,
+    "ratio": 2.3726,
+    "roundtrip_ok": true
   },
   {
     "file": "tokenizer.json",
     "codec": "lzma",
-    "original_bytes": "7031645",
-    "compressed_bytes": "1378629",
-    "ratio": "5.1005",
-    "roundtrip_ok": "True"
+    "original_bytes": 7031645,
+    "compressed_bytes": 1378629,
+    "ratio": 5.1005,
+    "roundtrip_ok": true
+  },
+  {
+    "file": "tokenizer.json",
+    "codec": "lzma",
+    "original_bytes": 7031645,
+    "compressed_bytes": 1378629,
+    "ratio": 5.1005,
+    "roundtrip_ok": true
   },
   {
     "file": "tokenizer.json",
     "codec": "bz2",
-    "original_bytes": "7031645",
-    "compressed_bytes": "1414012",
-    "ratio": "4.9728",
-    "roundtrip_ok": "True"
+    "original_bytes": 7031645,
+    "compressed_bytes": 1414012,
+    "ratio": 4.9728,
+    "roundtrip_ok": true
   },
   {
     "file": "tokenizer.json",
     "codec": "zlib",
-    "original_bytes": "7031645",
-    "compressed_bytes": "1923813",
-    "ratio": "3.6551",
-    "roundtrip_ok": "True"
+    "original_bytes": 7031645,
+    "compressed_bytes": 1923813,
+    "ratio": 3.6551,
+    "roundtrip_ok": true
   },
   {
     "file": "tokenizer_config.json",
     "codec": "zlib",
-    "original_bytes": "7228",
-    "compressed_bytes": "1320",
-    "ratio": "5.4758",
-    "roundtrip_ok": "True"
+    "original_bytes": 7228,
+    "compressed_bytes": 1320,
+    "ratio": 5.4758,
+    "roundtrip_ok": true
+  },
+  {
+    "file": "tokenizer_config.json",
+    "codec": "zlib",
+    "original_bytes": 7228,
+    "compressed_bytes": 1320,
+    "ratio": 5.4758,
+    "roundtrip_ok": true
   },
   {
     "file": "tokenizer_config.json",
     "codec": "lzma",
-    "original_bytes": "7228",
-    "compressed_bytes": "1370",
-    "ratio": "5.2759",
-    "roundtrip_ok": "True"
+    "original_bytes": 7228,
+    "compressed_bytes": 1370,
+    "ratio": 5.2759,
+    "roundtrip_ok": true
   },
   {
     "file": "tokenizer_config.json",
     "codec": "bz2",
-    "original_bytes": "7228",
-    "compressed_bytes": "1424",
-    "ratio": "5.0758",
-    "roundtrip_ok": "True"
+    "original_bytes": 7228,
+    "compressed_bytes": 1424,
+    "ratio": 5.0758,
+    "roundtrip_ok": true
   },
   {
     "file": "vocab.json",
     "codec": "lzma",
-    "original_bytes": "2776833",
-    "compressed_bytes": "751481",
-    "ratio": "3.6951",
-    "roundtrip_ok": "True"
+    "original_bytes": 2776833,
+    "compressed_bytes": 751481,
+    "ratio": 3.6951,
+    "roundtrip_ok": true
+  },
+  {
+    "file": "vocab.json",
+    "codec": "lzma",
+    "original_bytes": 2776833,
+    "compressed_bytes": 751481,
+    "ratio": 3.6951,
+    "roundtrip_ok": true
   },
   {
     "file": "vocab.json",
     "codec": "bz2",
-    "original_bytes": "2776833",
-    "compressed_bytes": "862171",
-    "ratio": "3.2207",
-    "roundtrip_ok": "True"
+    "original_bytes": 2776833,
+    "compressed_bytes": 862171,
+    "ratio": 3.2207,
+    "roundtrip_ok": true
   },
   {
     "file": "vocab.json",
     "codec": "zlib",
-    "original_bytes": "2776833",
-    "compressed_bytes": "1070456",
-    "ratio": "2.5941",
-    "roundtrip_ok": "True"
+    "original_bytes": 2776833,
+    "compressed_bytes": 1070456,
+    "ratio": 2.5941,
+    "roundtrip_ok": true
   }
 ]

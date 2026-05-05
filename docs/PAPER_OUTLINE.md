@@ -44,20 +44,20 @@ We study exact, lossless compression of model artefacts for large language model
 For original size `S_o` and compressed size `S_c`:
 
 ```latex
-R = \frac{S_o}{S_c}
+R = \\frac{S_o}{S_c}
 ```
 
 ### 2. Entropy lower bound
 For symbol distribution `p`:
 
 ```latex
-H(p) = -\sum_i p_i \log_2 p_i
+H(p) = -\\sum_i p_i \\log_2 p_i
 ```
 
 Any lossless compressor must satisfy the usual lower bound on expected code length:
 
 ```latex
-\mathbb{E}[L] \ge H(p)
+\\mathbb{E}[L] \\ge H(p)
 ```
 
 ### 3. Byte-plane decomposition
@@ -67,7 +67,7 @@ If a floating-point value is decomposed into sign, exponent, and mantissa compon
 For tensor block `B_k`, a codec may use different local models or codebooks:
 
 ```latex
-L(B) = \sum_k L(B_k)
+L(B) = \\sum_k L(B_k)
 ```
 
 This is the starting point for a more practical architecture-aware compressor.

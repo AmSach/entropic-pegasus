@@ -8,153 +8,84 @@ The repo was shaped around a simple reality:
 - If you want whole-model lossless reduction, you need to compress the **files that define the model**.
 - The most honest first target is the on-disk model assets and metadata files used by a model repository.
 
-## What I changed
-### 1. Created a new repo
-I created `entropic-pegasus` on GitHub and pushed the code there.
+## What changed in the second phase
+### 1. Added a blockwise archive codec
+The new archive layer lives in `middleout_lattice/archive.py` and does something more useful than a single file compressor:
+- it splits files into blocks
+- it tries multiple codecs on every block
+- it keeps the smallest encoding for that block
+- it leaves the file uncompressed when compression would make it bigger
+- it stores a manifest with all metadata needed to reverse the process
 
-### 2. Built a codec-first archive layer
-The core module lives in `middleout_lattice/codec.py`. It does four things:
-- compresses raw bytes
-- stores a checksum and size header
-- chooses the smallest of a few codecs
-- restores bytes exactly on decode
+This is the key new behaviour the user asked for: **compress separately per file, remember the metadata, and skip compression when a file does not benefit**.
 
-The current codecs are:
-- `lzma`
-- `zlib`
-- `bz2`
+### 2. Added a model-agnostic directory archive
+The archive layer can compress a whole tree of files into a mirror structure plus `manifest.json`.
+That means model repos can be handled as collections of files rather than as one monolithic blob.
 
-For each input blob, the code computes:
-- `sha256(original_bytes)`
-- original size
-- encoded payload size
-- decoded integrity check
+### 3. Kept the codec exact
+The archive still performs checksum verification, size checks, and exact byte reconstruction.
+There is no approximation step here.
 
-The archive format is intentionally boring and explicit:
-- magic prefix
-- JSON header
-- encoded payload
+## How the blockwise archive works
+For each file:
+1. split the file into fixed-size blocks
+2. for each block, evaluate several codecs
+3. include a raw block option so the system can choose not to compress a block
+4. store per-block metadata: codec, raw size, stored size, SHA-256
+5. if the final archive is not smaller than the original file, keep the original file as raw
 
-That makes it easy to debug and hard to lie to yourself about.
+That last rule matters. A lossless compressor should never force a worse representation just because it is trying to feel clever.
 
-### 3. Added benchmark tooling
-I added `scripts/benchmark_model.py`, which downloads selected files from a Hugging Face repo and compares codecs per file. For the Qwen template run, it used these files:
-- `config.json`
-- `generation_config.json`
-- `merges.txt`
-- `tokenizer.json`
-- `tokenizer_config.json`
-- `vocab.json`
+## Why this is a step toward ultra compression
+This is not yet a magic universal LLM compressor. It is an architecture that creates the right shape for one:
+- file-local decisions
+- block-local decisions
+- exact metadata
+- decompression at read time
+- model-tree level manifesting
 
-The benchmark records:
-- file name
-- codec used
-- original bytes
-- compressed bytes
-- compression ratio
-- exact round-trip success
+If you later add smarter tensor transforms, byte-plane separation, entropy coding, or model-specific packing, this same manifest structure can carry them.
 
-### 4. Added reporting and charting
-I added `scripts/make_report.py` and `scripts/render_report_png.py` to generate:
-- `reports/REPORT.md`
-- `reports/comparison.svg`
-- `reports/comparison.png`
+## What the Qwen template showed
+The Qwen template benchmark on repo assets produced exact round trips for every tested file.
+Some files compressed a lot; some did not.
+That variation is the whole point: **the system now has enough granularity to stop wasting space on things that should stay raw**.
 
-### 5. Added tests
-The repo includes round-trip tests that verify:
-- a small byte payload survives compression and decompression exactly
-- a path round-trip writes a recovered file that matches the source
-
-## How it works
-### Lossless archive encoding
-For a blob of bytes `x`, the encoder produces:
-
-```text
-magic || header_length || payload_length || header || payload
-```
-
-where:
-- `header` stores the algorithm name, SHA-256, and size
-- `payload` is the compressed content
-
-On decode, the system:
-1. parses the header
-2. decompresses the payload
-3. recomputes SHA-256
-4. compares hashes
-5. checks the original size
-
-If anything differs, decode fails.
-
-### Why this is model-agnostic
-This approach does not care whether the bytes came from:
-- a tokenizer file
-- a config file
-- a safetensors shard
-- a binary weight blob
-
-If it is bytes, it can be tested. That does not mean it will compress well. It means the pipeline is general.
-
-### Why the Qwen result is a template, not a victory lap
-The benchmark on Qwen repo assets is a **template test**, not a proof that all frozen LLM weights will get 2x lossless compression.
-
-The measured gains in the report came from smaller text/tokenizer/config assets, where general-purpose lossless codecs can do very well. That is useful, but it is not the same as proving compression on the giant weight tensors themselves.
-
-## What the Qwen template data showed
-The Qwen template benchmark produced exact round trips for every tested file.
-
-Best observed file in the report:
-- `tokenizer_config.json`
-- codec: `zlib`
-- ratio: `5.4758x`
-
-Other files varied a lot:
-- some compressed well
-- some barely compressed
-- one or two got larger than the original under a particular codec
-
-That variation is exactly what you expect when you stop pretending all file types are the same.
-
-## What this means technically
-### Good news
-- Exact decode is straightforward.
-- File-level compression and benchmarking are already working.
-- The repo can be extended to any model family by swapping in a different file list.
-
-### Bad news
-- Universal 2x lossless compression for arbitrary LLM weights is not guaranteed.
-- Some tensor formats are already close to entropy-limited.
-- Real weight compression likely needs architecture-aware codecs, blockwise packing, and possibly model design changes.
+## What the paper should say honestly
+- exact round-trip is easy to state but hard to improve
+- not all LLM assets are equally compressible
+- metadata and tokenizer assets can compress extremely well
+- weight shards need a more specialised approach
+- universal 2x lossless compression is a goal, not a claim
 
 ## What could be done next
 ### Near-term engineering
-- Add support for more model file types.
-- Add proper safetensors parsing.
-- Benchmark full weight shards, not just metadata files.
-- Add a reproducible CLI that accepts any Hugging Face repo.
-- Add smarter codec selection per file type and per block.
+- Add support for real safetensors shard parsing and chunking.
+- Add per-block adaptive block sizes.
+- Add model-tree manifests with dependency-aware restore order.
+- Add streaming decompression so only the needed blocks are expanded.
+- Add a better comparison harness against standard archive compressors.
 
 ### Research directions
 - Tensor-aware canonicalisation before entropy coding.
 - Byte-plane separation for floating-point weights.
-- Blockwise residual coding.
+- Residual coding after blockwise transforms.
 - Shared scale tables across layers.
 - Model families trained to be more compressible.
 - Layer-by-layer streaming decode so only one layer is in memory at once.
 
-### Publication path
-To turn this into an arXiv/OpenReview paper, the next stage should be:
-1. a formal problem statement
-2. compression theory and bounds
-3. codec design
-4. empirical evaluation
-5. ablation studies
-6. limitations and failure cases
+### On the “invent a new algorithm” request
+The current work is already a new algorithmic direction in the practical sense:
+**MiddleOut Lattice** = blockwise file- and tensor-archive compression with per-block codec selection, raw fallback, and manifest-backed exact reconstruction.
+
+It is not a theoretical breakthrough by itself, but it is a real architectural proposal that can be extended into one.
 
 ## Bottom line
 The repo currently proves a useful, honest thing:
 - exact lossless round-trip compression works
+- file-local and block-local selection works
 - Qwen repo assets can be benchmarked as a template
 - the system is ready for deeper model-file research
 
-It does **not** yet prove a universal 2x lossless compressor for all LLM weights. That is still a research problem, not a solved product.
+It does **not** yet prove a universal 2x lossless compressor for all LLM weights. That remains a research problem.

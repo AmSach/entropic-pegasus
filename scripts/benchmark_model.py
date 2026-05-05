@@ -22,6 +22,11 @@ def fetch(repo_id: str, filename: str) -> bytes:
         return resp.read()
 
 
+def _best_compression(data: bytes):
+    best = compress_bytes(data)
+    return best.codec, len(best.compressed_bytes), best.compressed_bytes
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-id", default="Qwen/Qwen2.5-0.5B")
@@ -45,14 +50,14 @@ def main():
                 "ratio": round(len(data) / max(1, len(blob)), 4),
                 "roundtrip_ok": decompress_bytes(blob) == data,
             })
-        best = compress_bytes(data)
+        best_codec, best_size, best_blob = _best_compression(data)
         rows.append({
             "file": filename,
-            "codec": best.codec,
+            "codec": best_codec,
             "original_bytes": len(data),
-            "compressed_bytes": len(best.compressed_bytes),
-            "ratio": round(len(data) / max(1, len(best.compressed_bytes)), 4),
-            "roundtrip_ok": decompress_bytes(best.compressed_bytes) == data,
+            "compressed_bytes": best_size,
+            "ratio": round(len(data) / max(1, best_size), 4),
+            "roundtrip_ok": decompress_bytes(best_blob) == data,
         })
 
     rows.sort(key=lambda row: (row["file"], row["compressed_bytes"]))

@@ -1,7 +1,19 @@
 file,codec,original_bytes,compressed_bytes,ratio,roundtrip_ok,notes
-config.json,zlib,681,475,1.4337,True,template run on Qwen2.5-0.5B repo asset
-generation_config.json,bz2,138,256,0.5391,True,template run on Qwen2.5-0.5B repo asset
-merges.txt,bz2,1671839,525417,3.1819,True,template run on Qwen2.5-0.5B repo asset
-tokenizer.json,lzma,7031645,1378629,5.1005,True,template run on Qwen2.5-0.5B repo asset
-tokenizer_config.json,zlib,7228,1320,5.4758,True,template run on Qwen2.5-0.5B repo asset
-vocab.json,lzma,2776833,751481,3.6951,True,template run on Qwen2.5-0.5B repo asset
+config.json,zlib,681,475,1.4337,True,metadata file; general compression helps
+config.json,bz2,681,518,1.3147,True,metadata file; general compression helps
+config.json,lzma,681,549,1.2404,True,metadata file; general compression helps
+generation_config.json,zlib,138,227,0.6079,True,already tiny; compression overhead dominates
+generation_config.json,bz2,138,256,0.5391,True,already tiny; compression overhead dominates
+generation_config.json,lzma,138,285,0.4842,True,already tiny; compression overhead dominates
+merges.txt,bz2,1671839,525417,3.1819,True,text-heavy vocab merges
+merges.txt,lzma,1671839,577429,2.8953,True,text-heavy vocab merges
+merges.txt,zlib,1671839,704654,2.3726,True,text-heavy vocab merges
+tokenizer.json,lzma,7031645,1378629,5.1005,True,highly compressible JSON
+tokenizer.json,bz2,7031645,1414012,4.9728,True,highly compressible JSON
+tokenizer.json,zlib,7031645,1923813,3.6551,True,highly compressible JSON
+tokenizer_config.json,zlib,7228,1320,5.4758,True,small config with repeated structure
+tokenizer_config.json,lzma,7228,1370,5.2759,True,small config with repeated structure
+tokenizer_config.json,bz2,7228,1424,5.0758,True,small config with repeated structure
+vocab.json,lzma,2776833,751481,3.6951,True,large vocab list with repetitive token patterns
+vocab.json,bz2,2776833,862171,3.2207,True,large vocab list with repetitive token patterns
+vocab.json,zlib,2776833,1070456,2.5941,True,large vocab list with repetitive token patterns

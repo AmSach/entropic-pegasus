@@ -6,7 +6,13 @@ Lossless compression for model files and tensor archives. It is intentionally mo
 - exact round-trip compression for arbitrary bytes
 - per-file codec comparison
 - report generation
-- SVG benchmark chart output
+- SVG + PNG benchmark chart output
+- template data for Qwen2.5-0.5B
+
+## Documentation
+- `file 'docs/TECHNICAL_REPORT.md'`
+- `file 'docs/PAPER_OUTLINE.md'`
+- `file 'data/qwen_template.csv'`
 
 ## What this does not promise
 - It does not invent a universal free lunch.

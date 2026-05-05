@@ -5,11 +5,13 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+ROOT = Path(__file__).resolve().parents[1]
+REPORT_DIR = ROOT / "reports"
+
 
 def main():
-    report_dir = Path("reports")
-    csv_path = report_dir / "benchmark.csv"
-    out = report_dir / "comparison.png"
+    csv_path = REPORT_DIR / "benchmark.csv"
+    out = REPORT_DIR / "comparison.png"
     rows = list(csv.DictReader(csv_path.open()))
     width, height = 1600, 900
     img = Image.new("RGB", (width, height), "#0f172a")

@@ -3,6 +3,9 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+REPORT_DIR = ROOT / "reports"
+
 
 def _svg_bar_chart(rows):
     labels = [f"{r['file']} / {r['codec']}" for r in rows]
@@ -30,26 +33,29 @@ def _svg_bar_chart(rows):
 
 
 def main():
-    report_dir = Path("reports")
-    csv_path = report_dir / "benchmark.csv"
-    out_md = report_dir / "REPORT.md"
-    out_svg = report_dir / "comparison.svg"
+    csv_path = REPORT_DIR / "benchmark.csv"
+    out_md = REPORT_DIR / "REPORT.md"
+    out_svg = REPORT_DIR / "comparison.svg"
     if not csv_path.exists():
-        raise SystemExit("benchmark.csv not found; run scripts/benchmark_model.py first")
+        raise SystemExit(f"benchmark.csv not found at {csv_path}; run scripts/benchmark_model.py first")
     rows = list(csv.DictReader(csv_path.open()))
     best = max(rows, key=lambda r: float(r["ratio"]))
-    out_md.write_text(
-        "# Benchmark report\n\n"
-        f"- best file: {best['file']}\n"
-        f"- best codec: {best['codec']}\n"
-        f"- original bytes: {best['original_bytes']}\n"
-        f"- compressed bytes: {best['compressed_bytes']}\n"
-        f"- ratio: {best['ratio']}\n"
-        f"- roundtrip ok: {best['roundtrip_ok']}\n\n"
-        "## Full comparison\n\n"
-        + "\n".join(f"- {r['file']} / {r['codec']}: {r['ratio']}x" for r in rows)
-        + "\n"
-    )
+    lines = [
+        "# Benchmark report",
+        "",
+        f"- best file: {best['file']}",
+        f"- best codec: {best['codec']}",
+        f"- original bytes: {best['original_bytes']}",
+        f"- compressed bytes: {best['compressed_bytes']}",
+        f"- ratio: {best['ratio']}",
+        f"- roundtrip ok: {best['roundtrip_ok']}",
+        "",
+        "## Full comparison",
+        "",
+    ]
+    lines.extend(f"- {r['file']} / {r['codec']}: {r['ratio']}x" for r in rows)
+    lines.append("")
+    out_md.write_text("\n".join(lines))
     out_svg.write_text(_svg_bar_chart(rows))
     print(out_md)
     print(out_svg)

@@ -1,0 +1,46 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm,booktabs,graphicx,hyperref}
+\usepackage[margin=1in]{geometry}
+
+\title{MiddleOut Lattice: Lossless Compression of LLM Artefacts with Codec-Aware Tensor Packing}
+\author{AmSach}
+\date{\today}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study exact, lossless compression of model artefacts for large language models. The core question is not whether one can quantise a cache, but whether one can reduce the storage and transfer cost of model files while preserving bit-for-bit reconstruction. We present a codec-first architecture that compresses arbitrary model files, evaluates codec choice per file, and provides a template for tensor-aware compression. Experiments on Qwen2.5-0.5B artefacts show that some model files compress substantially while remaining exactly recoverable, but also demonstrate that file type strongly controls compressibility.
+\end{abstract}
+
+\section{Introduction}
+\section{Problem statement}
+\section{Related work}
+\section{Information-theoretic preliminaries}
+\section{Codec-first architecture}
+\section{Archive format and exact reconstruction}
+\section{Qwen template benchmark}
+\section{Results}
+\section{Toward tensor-aware codecs}
+\section{Limitations}
+\section{Conclusion}
+
+\appendix
+\section{Derivations}
+\subsection{Compression ratio}
+Let $S_o$ and $S_c$ denote original and compressed size. Then
+\[
+R = \frac{S_o}{S_c}.
+\]
+
+\subsection{Entropy lower bound}
+For a discrete distribution $p$, the Shannon entropy is
+\[
+H(p) = -\sum_i p_i \log_2 p_i.
+\]
+Any lossless coding scheme has expected length at least the entropy rate up to coding overhead.
+
+\end{document}

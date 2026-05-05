@@ -1,0 +1,7 @@
+file,codec,original_bytes,compressed_bytes,ratio,roundtrip_ok,notes
+config.json,zlib,681,475,1.4337,True,template run on Qwen2.5-0.5B repo asset
+generation_config.json,bz2,138,256,0.5391,True,template run on Qwen2.5-0.5B repo asset
+merges.txt,bz2,1671839,525417,3.1819,True,template run on Qwen2.5-0.5B repo asset
+tokenizer.json,lzma,7031645,1378629,5.1005,True,template run on Qwen2.5-0.5B repo asset
+tokenizer_config.json,zlib,7228,1320,5.4758,True,template run on Qwen2.5-0.5B repo asset
+vocab.json,lzma,2776833,751481,3.6951,True,template run on Qwen2.5-0.5B repo asset

@@ -34,12 +34,7 @@ def _xor_restore(data: bytes) -> bytes:
     return bytes(out)
 
 
-def mosaic_encode(
-    data: bytes,
-    word_size: int,
-    plane_order: Iterable[int] | None = None,
-    residual: str = "xor",
-) -> tuple[bytes, MosaicMeta]:
+def mosaic_encode(data: bytes, word_size: int, plane_order: Iterable[int] | None = None, residual: str = "xor") -> tuple[bytes, MosaicMeta]:
     if word_size < 2:
         raise ValueError("word_size must be at least 2")
     if plane_order is None:
@@ -62,14 +57,7 @@ def mosaic_encode(
             plane = _xor_prefix(plane)
         stream.extend(plane)
 
-    meta = MosaicMeta(
-        word_size=word_size,
-        plane_order=plane_order,
-        residual=residual,
-        pad_len=pad_len,
-        original_size=len(data),
-        word_count=word_count,
-    )
+    meta = MosaicMeta(word_size=word_size, plane_order=plane_order, residual=residual, pad_len=pad_len, original_size=len(data), word_count=word_count)
     return bytes(stream), meta
 
 

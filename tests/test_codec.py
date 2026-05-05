@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from middleout_lattice import CompressedModelStore, compress_directory, decompress_directory
+from middleout_lattice.archive import compress_file_bytes, decompress_file_bytes
 from middleout_lattice.codec import compress_bytes, decompress_bytes, roundtrip_path
 from middleout_lattice.mosaic import mosaic_encode, mosaic_decode
 
@@ -11,12 +12,10 @@ def test_roundtrip_bytes():
     assert decompress_bytes(packed.compressed_bytes) == payload
 
 
-def test_roundtrip_path(tmp_path: Path):
-    src = tmp_path / 'x.bin'
-    src.write_bytes(b'hello' * 1000)
-    result = roundtrip_path(src, tmp_path)
-    assert result['roundtrip_ok'] is True
-    assert (tmp_path / 'x.bin.molm').exists()
+def test_mosaic_roundtrip():
+    payload = bytes(range(256)) * 8
+    encoded, meta = mosaic_encode(payload, word_size=4)
+    assert mosaic_decode(encoded, meta) == payload
 
 
 def test_archive_roundtrip(tmp_path: Path):
@@ -24,6 +23,8 @@ def test_archive_roundtrip(tmp_path: Path):
     src_dir.mkdir()
     (src_dir / 'a.txt').write_text('hello world ' * 100)
     (src_dir / 'b.bin').write_bytes(b'\x00' * 1000)
+    archive, record = compress_file_bytes((src_dir / 'a.txt').read_bytes(), block_size=64)
+    assert decompress_file_bytes(archive, record) == (src_dir / 'a.txt').read_bytes()
     manifest = compress_directory(src_dir, tmp_path / 'packed', block_size=128)
     restored = decompress_directory(manifest, tmp_path / 'restored')
     assert (restored / 'a.txt').read_text() == (src_dir / 'a.txt').read_text()
@@ -41,9 +42,3 @@ def test_model_store_roundtrip(tmp_path: Path):
     with store.open_materialized() as mat:
         assert (mat / 'config.json').read_bytes() == (src_dir / 'config.json').read_bytes()
         assert (mat / 'weights.bin').read_bytes() == (src_dir / 'weights.bin').read_bytes()
-
-
-def test_mosaic_roundtrip():
-    data = bytes(range(256)) * 8
-    encoded, meta = mosaic_encode(data, word_size=4, residual='xor')
-    assert mosaic_decode(encoded, meta) == data

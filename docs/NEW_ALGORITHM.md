@@ -1,40 +1,38 @@
-# New algorithm: Mosaic Archive Packing
+# Mosaic Archive Packing
 
-This repo now includes a new exact compression path called Mosaic Archive Packing.
+Mosaic Archive Packing is a reversible pre-transform for lossless compression. It was added because the repo needed more than "pick the smallest codec"; it needed an actual data-layout transform that may expose additional structure before entropy coding.
 
-## What it is
-Mosaic Archive Packing is a lossless transform that:
-- splits a block into fixed-size words
-- separates each word into byte planes
-- optionally applies XOR residual coding per plane
-- lets the archive chooser compare Mosaic against ordinary codecs and raw bytes
-- stores enough metadata to restore the block exactly
+## Intuition
+Traditional compressors see a byte stream. Mosaic first reorders the stream into byte planes across fixed-width words, then optionally applies a prefix-XOR residual to each plane. This can make adjacent bytes more predictable for the downstream codec.
 
-It is not a statistical compressor by itself. It is a structure-extraction transform that can make some byte layouts far more compressible before the normal codecs see them.
+## Encoding steps
+Given a byte string `x` and a word size `w`:
+1. Pad `x` to a multiple of `w`.
+2. Split into `w` byte planes.
+3. Reorder planes using a permutation.
+4. Optionally apply prefix-XOR residual coding on each plane.
+5. Compress the transformed stream with a standard codec.
 
-## Why this counts as new
-The old version only compared generic codecs. Mosaic adds an explicit reversible transform over the byte layout itself.
+## Decoding steps
+1. Decompress the stored stream.
+2. Undo the residual transform.
+3. Reassemble the planes into words.
+4. Truncate the original padding.
 
-## How it works
-For a block of bytes:
-1. Choose a word size, usually 4 or 8.
-2. Build byte planes across the words.
-3. Optionally apply XOR residual coding to each plane.
-4. Concatenate planes into a stream.
-5. Let the archive layer compare the transformed stream to raw, zlib, lzma, and bz2.
-6. Store the winner and the transform metadata.
+## Why this is useful
+A lot of model artefacts are structured but not obviously textual:
+- safetensors fragments
+- binary blobs
+- repeated numeric patterns
+- mixed-entropy payloads with local correlations
 
-## Exact reconstruction
-The decoder reverses the steps in the opposite order. Because the transform is reversible and the archive still stores hashes, the result is exact.
+Mosaic is a cheap reversible transform that can make those structures more obvious to a generic codec.
 
-## Where it helps
-This can help on binary layouts where neighbouring bytes or neighbouring words have structure, for example:
-- some tensor shard layouts
-- binary blobs with repeated local patterns
-- mixed text/binary files with aligned structure
+## Exactness
+Mosaic is lossless because it only permutes and re-encodes bytes reversibly. No information is discarded.
 
-## Where it does not help
-If the data is already close to random, Mosaic will usually not beat ordinary codecs. In that case the archive falls back to raw storage.
+## Current implementation
+The implementation lives in `file 'middleout_lattice/mosaic.py'` and is integrated into the archive selection logic.
 
-## Research value
-Mosaic gives us a real experimental axis beyond “which off-the-shelf codec is smaller?” It creates a reversible pre-transform that can be studied, benchmarked, and extended into a tensor-aware codec family.
+## Caveat
+This is still not magic. It is a better front-end for lossless coding, not a promise that every file will compress well.

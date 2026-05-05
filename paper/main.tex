@@ -165,6 +165,21 @@ vocab.json & lzma & 2776833 & 751481 & 3.6951 \\
 
 The strongest observed ratio in the template benchmark is 5.4758x on \texttt{tokenizer\_config.json}. Importantly, that is a small metadata file, not the main weight shard. So it is evidence of a good archive strategy, not proof of universal ultra-compression on full model weights.
 
+
+\subsection{Mosaic Archive Packing}
+We also introduce a reversible pre-transform called Mosaic Archive Packing. Given a byte stream, Mosaic groups bytes into fixed-width words, extracts byte planes, optionally applies prefix-XOR residual coding, and feeds the transformed stream to a standard lossless codec. The transform is reversible, so it preserves exact reconstruction while potentially increasing local predictability.
+
+For a word size $w$, let $x$ be padded to length divisible by $w$, and let $x_{i,j}$ denote the $j$th byte of the $i$th word. Mosaic forms plane streams
+\[
+P_j = (x_{1,j}, x_{2,j}, \dots, x_{N,j})
+\]
+and may further map each plane through the prefix-XOR transform\[
+R_t = P_t \oplus P_{t-1},
+\]
+with $P_0=0$. The decoder reverses this exactly by recovering $P_t$ from $R_t$ and then reassembling the original words.
+
+Mosaic matters because it changes the data geometry before entropy coding. Generic codecs are good at repeated symbols and local runs; Mosaic can create both out of structured binary blocks.
+
 \section{Results and analysis}
 
 The results support three claims.

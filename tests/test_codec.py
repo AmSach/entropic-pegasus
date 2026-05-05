@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from middleout_lattice import CompressedModelStore, compress_directory, decompress_directory, compress_file_bytes, decompress_file_bytes
+from middleout_lattice import CompressedModelStore, compress_directory, decompress_directory
 from middleout_lattice.codec import compress_bytes, decompress_bytes, roundtrip_path
+from middleout_lattice.mosaic import mosaic_encode, mosaic_decode
 
 
 def test_roundtrip_bytes():
@@ -40,3 +41,9 @@ def test_model_store_roundtrip(tmp_path: Path):
     with store.open_materialized() as mat:
         assert (mat / 'config.json').read_bytes() == (src_dir / 'config.json').read_bytes()
         assert (mat / 'weights.bin').read_bytes() == (src_dir / 'weights.bin').read_bytes()
+
+
+def test_mosaic_roundtrip():
+    data = bytes(range(256)) * 8
+    encoded, meta = mosaic_encode(data, word_size=4, residual='xor')
+    assert mosaic_decode(encoded, meta) == data

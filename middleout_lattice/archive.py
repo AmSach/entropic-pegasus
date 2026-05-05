@@ -8,8 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from .codec import CODECS, _decode_payload, _encode_payload
+from .mosaic import mosaic_candidates, mosaic_decode, MosaicMeta
 
-MAGIC = b"MOLA1"
+MAGIC = b"MOLA2"
 
 
 @dataclass
@@ -19,6 +20,8 @@ class BlockMeta:
     raw_size: int
     stored_size: int
     sha256: str
+    mode: str = "codec"
+    mosaic: dict[str, Any] | None = None
 
 
 @dataclass
@@ -44,13 +47,23 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _best_block_encoding(data: bytes) -> tuple[str, bytes]:
-    candidates: list[tuple[str, bytes]] = [("raw", data)]
+def _best_block_encoding(data: bytes) -> tuple[str, bytes, str, dict[str, Any] | None]:
+    candidates: list[tuple[str, bytes, str, dict[str, Any] | None]] = [("raw", data, "raw", None)]
     for codec in CODECS:
         encoded = _encode_payload(codec, data)
-        candidates.append((codec, encoded))
-    codec, payload = min(candidates, key=lambda item: len(item[1]))
-    return codec, payload
+        candidates.append((codec, encoded, "codec", None))
+    for encoded, meta in mosaic_candidates(data):
+        if len(encoded) < len(data):
+            candidates.append(("mosaic", encoded, "mosaic", {
+                "word_size": meta.word_size,
+                "plane_order": meta.plane_order,
+                "residual": meta.residual,
+                "pad_len": meta.pad_len,
+                "original_size": meta.original_size,
+                "word_count": meta.word_count,
+            }))
+    codec, payload, mode, mosaic = min(candidates, key=lambda item: len(item[1]))
+    return codec, payload, mode, mosaic
 
 
 def _pack_archive(blocks: list[dict[str, Any]]) -> bytes:
@@ -92,11 +105,13 @@ def compress_file_bytes(data: bytes, block_size: int = 1 << 20) -> tuple[bytes, 
 
     for index, offset in enumerate(range(0, raw_size, block_size)):
         chunk = data[offset : offset + block_size]
-        codec, payload = _best_block_encoding(chunk)
+        codec, payload, mode, mosaic = _best_block_encoding(chunk)
         blocks.append(
             {
                 "index": index,
                 "codec": codec,
+                "mode": mode,
+                "mosaic": mosaic,
                 "raw_size": len(chunk),
                 "stored_size": len(payload),
                 "sha256": _sha256(chunk),
@@ -144,8 +159,11 @@ def decompress_file_bytes(blob: bytes, record: FileRecord) -> bytes:
         stored_size = int(block["stored_size"])
         chunk = bytes(payload[cursor : cursor + stored_size])
         cursor += stored_size
-        if block["codec"] == "raw":
+        mode = block.get("mode", "codec")
+        if mode == "raw":
             part = chunk
+        elif mode == "mosaic":
+            part = mosaic_decode(chunk, block["mosaic"])
         else:
             part = _decode_payload(block["codec"], chunk)
         if len(part) != int(block["raw_size"]):
@@ -162,7 +180,7 @@ def decompress_file_bytes(blob: bytes, record: FileRecord) -> bytes:
 def compress_directory(source_dir: Path, target_dir: Path, block_size: int = 1 << 20) -> Path:
     source_dir = source_dir.resolve()
     target_dir.mkdir(parents=True, exist_ok=True)
-    manifest = ArchiveManifest(version=1, root=str(source_dir), files=[])
+    manifest = ArchiveManifest(version=2, root=str(source_dir), files=[])
 
     for source in sorted(source_dir.rglob("*")):
         if not source.is_file():

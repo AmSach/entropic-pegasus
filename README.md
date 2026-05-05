@@ -39,6 +39,11 @@ print(store.summary())
 print(store.read_bytes("config.json")[:80])
 ```
 
+
+## New algorithm
+- `Mosaic Archive Packing`: a reversible byte-plane + residual transform that can beat generic codecs on structured binary blocks.
+- Details: `file 'docs/NEW_ALGORITHM.md'`
+
 ## What this does not promise
 - It does not invent a universal free lunch.
 - It does not pretend every checkpoint will hit 2x lossless.

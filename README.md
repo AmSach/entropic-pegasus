@@ -27,3 +27,7 @@ The current architecture now has a blockwise archive layer that can:
 - It does not invent a universal free lunch.
 - It does not pretend every checkpoint will hit 2x lossless.
 - It does keep the decode exact.
+
+
+## Paper PDF
+- `file 'build/main.pdf'`

@@ -1,0 +1,5 @@
+strategy,original_bytes,compressed_bytes,ratio,roundtrip_ok
+raw,2237,2237,1.0,True
+whole-file:zlib,2237,253,8.8419,True
+per-tensor generic,2048,416,4.9231,True
+per-tensor mosaic,2048,412,4.9709,True

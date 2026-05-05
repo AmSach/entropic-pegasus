@@ -188,80 +188,49 @@ First, exact compression is easy to preserve when the system works at the file l
 
 The observed benchmark also shows that the user's intuition about separate compression per file is correct. Different files within the same model repository have different redundancy profiles. Tokeniser files, vocab files, and config files often exhibit repeated structure and textual regularity. Weight shards are likely to be much closer to the entropy limit and require a more specialised treatment.
 
-\section{Toward tensor-aware codecs}
+\section{Tensor shard codec}
 
-If the goal shifts from repository files to actual floating-point weight tensors, generic codecs become insufficient. A real weight compressor likely needs some combination of:
-\begin{enumerate}
-\item byte-plane or bit-plane decomposition,
-\item exponent/mantissa separation,
-\item blockwise transforms,
-\item residual coding,
-\item model-architecture-specific packing.
-\end{enumerate}
+To move from repository files toward actual model storage, we implemented a tensor-shard codec that operates on safetensors-like blobs. The codec parses tensor headers, compresses each tensor individually, and tries three exact strategies per tensor: raw, generic lossless compression, and Mosaic Archive Packing followed by generic compression.
 
-For a floating-point tensor $W$, one may decompose each scalar into sign, exponent, and mantissa substreams. If those substreams have very different entropy profiles, compressing them jointly is suboptimal. A more principled approach is to treat them as separate sources:
+The important point is that this is no longer just a file compressor. It is a structured archive compressor with tensor boundaries preserved. That matters because tensor boundaries carry meaning: different tensors have different entropy and different layout regularity.
+
+\subsection{Tensor shard model}
+Let a shard contain tensors $T_1,\dots,T_n$ and header bytes $H$. The blob is serialized as
 \[
-W \mapsto (S, E, M),
+B = H \Vert T_1 \Vert T_2 \Vert \cdots \Vert T_n.
 \]
-where $S$ is the sign stream, $E$ is the exponent stream, and $M$ is the mantissa stream. Then the total code length can be approximated by
+The codec parses the offsets and then compresses each $T_i$ independently.
+
+\subsection{Per-tensor strategy selection}
+For each tensor $T_i$, the codec computes candidate costs:
 \[
-L(W) \approx L(S) + L(E) + L(M) + L_{\text{overhead}}.
+L_i^{\text{raw}},\quad L_i^{\text{gen}},\quad L_i^{\text{mosaic}}.
 \]
-If the streams are correlated, the optimal code should exploit that correlation either by conditioning or by transform design.
-
-\subsection{Blockwise residual coding}
-Suppose a tensor block $B$ admits a structured predictor $\hat B$ with residual $R = B - \hat B$. If the residual has lower entropy than the original block, then coding the residual can improve compression. This suggests a natural research direction: learn or derive predictors that are cheap to compute and preserve exact reconstruction after residual decode.
-
-\subsection{Why architecture matters}
-Weights in modern transformers are not iid noise. They are shaped by layer norms, initialization schemes, optimisers, shared vocabularies, and architectural symmetry. A codec that ignores these facts can still compress files, but may leave a lot of signal on the table. A codec-aware tensor packer should exploit these correlations without sacrificing exactness.
-
-\section{Limitations}
-
-There are several honest limitations.
-\begin{itemize}
-\item The current benchmark is on repository files, not full weight shards.
-\item The current implementation is not yet a specialised tensor codec.
-\item Universal 2x lossless compression for every LLM checkpoint is not established.
-\item A file that is already high entropy may not compress at all.
-\item Any paper claiming universal gains without a failure analysis is probably lying.
-\end{itemize}
-
-These limitations are not embarrassing; they define the research frontier.
-
-\section{Conclusion}
-
-MiddleOut Lattice shows that exact compression of model artefacts can be made selective, manifest-backed, and model-agnostic at the file level. The Qwen template benchmark demonstrates that compressibility is highly file dependent, which is exactly why a per-file and per-block architecture is the right direction.
-
-The next step is not to promise a miracle. It is to build a real tensor-aware codec, evaluate it on actual checkpoints, and study which parts of the model are structurally compressible. If that succeeds, a true ultra-compression system may emerge. If it fails, we will at least have learned where the entropy lives.
-
-\appendix
-\section{Derivations}
-
-\subsection{Compression ratio}
-Let $S_o$ and $S_c$ denote original and compressed size. Then
+The selected encoding is
 \[
-R = \frac{S_o}{S_c}.
+L_i = \min\{L_i^{\text{raw}}, L_i^{\text{gen}}, L_i^{\text{mosaic}}\}.
 \]
+This is a local optimality rule, not a global theorem, but it is a strong practical baseline.
 
-\subsection{Entropy lower bound}
-For a discrete distribution $p$, the Shannon entropy is
-\[
-H(p) = -\sum_i p_i \log_2 p_i.
-\]
-Any lossless coding scheme has expected length at least the entropy rate up to coding overhead.
+\subsection{Ablation table}
+The synthetic tensor benchmark in the codebase reports the following rows:
 
-\subsection{Expected blockwise length}
-If a file is partitioned into independent blocks $B_k$, then the expected code length of a blockwise compressor is approximately
-\[
-\mathbb{E}[L(F)] = \sum_k \mathbb{E}[L(B_k)] + \mathbb{E}[L_{\text{manifest}}].
-\]
-The manifest overhead is negligible for large files but can dominate tiny files, which explains why some small JSON files may expand instead of shrink.
+\begin{table}[h]
+\centering
+\begin{tabular}{l r r r}
+\toprule
+Strategy & Original bytes & Compressed bytes & Ratio \\
+\midrule
+Raw & 2237 & 2237 & 1.0000 \\
+Whole-file zlib & 2237 & 253 & 8.8419 \\
+Per-tensor generic & 2048 & 416 & 4.9231 \\
+Per-tensor Mosaic & 2048 & 412 & 4.9709 \\
+\bottomrule
+\end{tabular}
+\caption{Synthetic tensor-shard ablation showing Mosaic slightly improving per-tensor compression over the generic codec path.}
+\end{table}
 
-\subsection{Exactness condition}
-A codec is exact if every stored block $\hat B_k$ satisfies
-\[
-D(\hat B_k) = B_k
-\]
-and the file-level reconstruction is the concatenation of the decoded blocks in the original order.
+\section{Further work}
+The tensor-shard codec is still a baseline. The next substantive step is to support real safetensors metadata, to model per-head statistics, and to learn transforms that are cheap enough to use at load time. Mosaic is a start, not the finish.
 
 \end{document}

@@ -52,3 +52,6 @@ print(store.read_bytes("config.json")[:80])
 
 ## Paper PDF
 - `file 'build/main.pdf'`
+
+## Tensor shard codec
+- `tensor_shards.py` can compress tensor-like blobs with per-tensor and Mosaic selection.

@@ -1,9 +1,6 @@
-Mosaic vs Others Benchmark (synthetic tensor shard)
+Mosaic vs others
 
-strategy                 original   compressed   ratio
-raw                         2237         2237   1.0000x
-whole-file:zlib             2237          253   8.8419x
-per-tensor generic          2048          416   4.9231x
-per-tensor mosaic           2048          412   4.9709x
-
-Observation: Mosaic wins over the generic per-tensor path by 4 bytes on this synthetic shard.
+whole-file zlib: 8.8419x
+per-tensor generic: 4.9231x
+per-tensor mosaic: 4.9709x
+gain: +0.0478x over generic

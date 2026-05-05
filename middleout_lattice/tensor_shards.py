@@ -277,13 +277,7 @@ def benchmark_tensor_strategies(blob: bytes) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     raw_size = len(blob)
 
-    rows.append({
-        "strategy": "raw",
-        "original_bytes": raw_size,
-        "compressed_bytes": raw_size,
-        "ratio": 1.0,
-        "roundtrip_ok": True,
-    })
+    rows.append({"strategy": "raw", "original_bytes": raw_size, "compressed_bytes": raw_size, "ratio": 1.0, "roundtrip_ok": True})
 
     generic = compress_bytes(blob)
     rows.append({
@@ -318,18 +312,6 @@ def benchmark_tensor_strategies(blob: bytes) -> list[dict[str, Any]]:
             restored = chosen.payload
         mosaic_ok = mosaic_ok and restored == raw
 
-    rows.append({
-        "strategy": "per-tensor generic",
-        "original_bytes": per_tensor_raw,
-        "compressed_bytes": per_tensor_generic,
-        "ratio": round(per_tensor_raw / max(1, per_tensor_generic), 4),
-        "roundtrip_ok": generic_ok,
-    })
-    rows.append({
-        "strategy": "per-tensor mosaic",
-        "original_bytes": per_tensor_raw,
-        "compressed_bytes": per_tensor_mosaic,
-        "ratio": round(per_tensor_raw / max(1, per_tensor_mosaic), 4),
-        "roundtrip_ok": mosaic_ok,
-    })
+    rows.append({"strategy": "per-tensor generic", "original_bytes": per_tensor_raw, "compressed_bytes": per_tensor_generic, "ratio": round(per_tensor_raw / max(1, per_tensor_generic), 4), "roundtrip_ok": generic_ok})
+    rows.append({"strategy": "per-tensor mosaic", "original_bytes": per_tensor_raw, "compressed_bytes": per_tensor_mosaic, "ratio": round(per_tensor_raw / max(1, per_tensor_mosaic), 4), "roundtrip_ok": mosaic_ok})
     return rows

@@ -7,6 +7,7 @@ Lossless compression for model files and tensor archives. It is intentionally mo
 - per-file codec comparison with skip-when-bigger behaviour
 - blockwise archive compression with metadata
 - a compressed model-store runtime that reads files on demand
+- tensor-shard compression with Mosaic and lattice packing
 - report generation
 - SVG + PNG benchmark chart output
 - template data for Qwen2.5-0.5B
@@ -15,6 +16,7 @@ Lossless compression for model files and tensor archives. It is intentionally mo
 - `file 'docs/TECHNICAL_REPORT.md'`
 - `file 'docs/PAPER_OUTLINE.md'`
 - `file 'docs/COMPRESSED_MODEL_STORE.md'`
+- `file 'docs/NEW_ALGORITHM.md'`
 - `file 'data/qwen_template.csv'`
 - `file 'paper/main.tex'`
 - live demo: https://amsach.github.io/projects/middleout-lattice/demo/
@@ -39,11 +41,13 @@ print(store.summary())
 print(store.read_bytes("config.json")[:80])
 ```
 
-
 ## New algorithm
-- `Mosaic Archive Packing`: a reversible byte-plane + residual transform that can beat generic codecs on structured binary blocks.
+- `Mosaic Archive Packing`: a reversible entropy-aware byte-plane transform plus residual coding, now with lattice fallback.
 - Details: `file 'docs/NEW_ALGORITHM.md'`
-- Now integrated into archive selection.
+
+## Tensor-shard codec
+- `tensor_shards.py` compresses safetensors-like blobs per tensor.
+- It now compares raw, generic, Mosaic, and lattice encodings.
 
 ## What this does not promise
 - It does not invent a universal free lunch.
@@ -52,6 +56,3 @@ print(store.read_bytes("config.json")[:80])
 
 ## Paper PDF
 - `file 'build/main.pdf'`
-
-## Tensor shard codec
-- `tensor_shards.py` can compress tensor-like blobs with per-tensor and Mosaic selection.

@@ -8,9 +8,18 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .codec import compress_bytes, decompress_bytes
-from .mosaic import MosaicMeta, mosaic_candidates, mosaic_decode
+from .mosaic import mosaic_candidates, mosaic_decode
 
-MAGIC = b"MTSH1"
+MAGIC = b"MTSH2"
+LATTICE_MAGIC = b"TLAT1"
+
+
+@dataclass
+class TensorArray:
+    name: str
+    dtype: str
+    shape: tuple[int, ...]
+    data: bytes
 
 
 @dataclass
@@ -38,11 +47,15 @@ class TensorShardManifest:
 
 
 @dataclass
-class TensorArray:
-    name: str
-    dtype: str
-    shape: tuple[int, ...]
-    data: bytes
+class TensorEncoding:
+    mode: str
+    codec: str
+    transform: str
+    transform_meta: dict[str, Any] | None
+    payload: bytes
+    raw_size: int
+    stored_size: int
+    sha256: str
 
 
 def _sha256(data: bytes) -> str:
@@ -103,19 +116,21 @@ def parse_safetensors_blob(blob: bytes) -> tuple[dict[str, Any], bytes, bytes, l
     return header, header_bytes, body, entries
 
 
-@dataclass
-class TensorEncoding:
-    mode: str
-    codec: str
-    transform: str
-    transform_meta: dict[str, Any] | None
-    payload: bytes
-    raw_size: int
-    stored_size: int
-    sha256: str
+def _decode_payload_for_block(payload: bytes, block: dict[str, Any]) -> bytes:
+    mode = block["mode"]
+    if mode == "raw":
+        return payload
+    decoded = decompress_bytes(payload)
+    if mode == "generic":
+        return decoded
+    if mode == "mosaic":
+        return mosaic_decode(decoded, block["transform_meta"])
+    if mode == "lattice":
+        return _decode_lattice_tensor(payload)
+    raise ValueError(f"unknown block mode: {mode}")
 
 
-def _best_tensor_encoding(data: bytes) -> TensorEncoding:
+def _choose_block_encoding(data: bytes, allow_lattice: bool = True) -> TensorEncoding:
     candidates: list[TensorEncoding] = [
         TensorEncoding(
             mode="raw",
@@ -154,15 +169,178 @@ def _best_tensor_encoding(data: bytes) -> TensorEncoding:
                 payload=transformed_best.compressed_bytes,
                 raw_size=len(data),
                 stored_size=len(transformed_best.compressed_bytes),
-                sha256=transformed_best.sha256,
+                sha256=_sha256(data),
             )
         )
+
+    if allow_lattice and len(data) >= 256:
+        lattice = _encode_lattice_tensor(data, allow_lattice=False)
+        candidates.append(lattice)
+
+    return min(candidates, key=lambda item: item.stored_size)
+
+
+def _pack_lattice_archive(manifest: dict[str, Any], payload: bytes) -> bytes:
+    manifest_bytes = json.dumps(manifest, separators=(",", ":")).encode("utf-8")
+    return LATTICE_MAGIC + len(manifest_bytes).to_bytes(8, "little") + manifest_bytes + payload
+
+
+def _unpack_lattice_archive(blob: bytes) -> tuple[dict[str, Any], bytes]:
+    if not blob.startswith(LATTICE_MAGIC):
+        raise ValueError("invalid lattice archive")
+    manifest_len = int.from_bytes(blob[len(LATTICE_MAGIC) : len(LATTICE_MAGIC) + 8], "little")
+    manifest_start = len(LATTICE_MAGIC) + 8
+    manifest_end = manifest_start + manifest_len
+    manifest = json.loads(blob[manifest_start:manifest_end].decode("utf-8"))
+    payload = blob[manifest_end:]
+    return manifest, payload
+
+
+def _encode_lattice_tensor(data: bytes, block_sizes: tuple[int, ...] = (256, 512, 1024, 2048), allow_lattice: bool = True) -> TensorEncoding:
+    best: TensorEncoding | None = None
+    for block_size in block_sizes:
+        if block_size <= 0 or len(data) < block_size:
+            continue
+
+        selected_blocks: list[dict[str, Any]] = []
+        payload_parts: list[bytes] = []
+        for index, start in enumerate(range(0, len(data), block_size)):
+            chunk = data[start : start + block_size]
+            chosen = _choose_block_encoding(chunk, allow_lattice=False)
+            selected_blocks.append(
+                {
+                    "index": index,
+                    "mode": chosen.mode,
+                    "codec": chosen.codec,
+                    "transform": chosen.transform,
+                    "transform_meta": chosen.transform_meta,
+                    "raw_size": chosen.raw_size,
+                    "stored_size": chosen.stored_size,
+                    "sha256": chosen.sha256,
+                }
+            )
+            payload_parts.append(chosen.payload)
+
+        lattice_manifest = {
+            "block_size": block_size,
+            "raw_size": len(data),
+            "sha256": _sha256(data),
+            "blocks": selected_blocks,
+        }
+        lattice_archive = _pack_lattice_archive(lattice_manifest, b"".join(payload_parts))
+        outer = compress_bytes(lattice_archive)
+        candidate = TensorEncoding(
+            mode="lattice",
+            codec=outer.codec,
+            transform="lattice",
+            transform_meta={"block_size": block_size, "block_count": len(selected_blocks)},
+            payload=outer.compressed_bytes,
+            raw_size=len(data),
+            stored_size=len(outer.compressed_bytes),
+            sha256=outer.sha256,
+        )
+        if best is None or candidate.stored_size < best.stored_size:
+            best = candidate
+
+    if best is None:
+        generic = compress_bytes(data)
+        best = TensorEncoding(
+            mode="generic",
+            codec=generic.codec,
+            transform="none",
+            transform_meta=None,
+            payload=generic.compressed_bytes,
+            raw_size=len(data),
+            stored_size=len(generic.compressed_bytes),
+            sha256=generic.sha256,
+        )
+    return best
+
+
+def _decode_lattice_tensor(payload: bytes) -> bytes:
+    lattice_blob = decompress_bytes(payload)
+    manifest, body = _unpack_lattice_archive(lattice_blob)
+    cursor = 0
+    parts: list[bytes] = []
+    for block in manifest["blocks"]:
+        stored_size = int(block["stored_size"])
+        chunk = bytes(body[cursor : cursor + stored_size])
+        cursor += stored_size
+        raw = _decode_payload_for_block(chunk, block)
+        if len(raw) != int(block["raw_size"]):
+            raise ValueError(f"tensor block size mismatch at block {block['index']}")
+        if _sha256(raw) != block["sha256"]:
+            raise ValueError(f"tensor block checksum mismatch at block {block['index']}")
+        parts.append(raw)
+
+    raw = b"".join(parts)
+    if len(raw) != int(manifest["raw_size"]):
+        raise ValueError("lattice tensor raw size mismatch")
+    if _sha256(raw) != manifest["sha256"]:
+        raise ValueError("lattice tensor checksum mismatch")
+    return raw
+
+
+def _best_mosaic_encoding(data: bytes) -> TensorEncoding | None:
+    best: TensorEncoding | None = None
+    for transformed, meta in mosaic_candidates(data):
+        transformed_best = compress_bytes(transformed)
+        candidate = TensorEncoding(
+            mode="mosaic",
+            codec=transformed_best.codec,
+            transform="mosaic",
+            transform_meta=asdict(meta),
+            payload=transformed_best.compressed_bytes,
+            raw_size=len(data),
+            stored_size=len(transformed_best.compressed_bytes),
+            sha256=transformed_best.sha256,
+        )
+        if best is None or candidate.stored_size < best.stored_size:
+            best = candidate
+    return best
+
+
+def _best_tensor_encoding(data: bytes) -> TensorEncoding:
+    candidates: list[TensorEncoding] = [
+        TensorEncoding(
+            mode="raw",
+            codec="raw",
+            transform="none",
+            transform_meta=None,
+            payload=data,
+            raw_size=len(data),
+            stored_size=len(data),
+            sha256=_sha256(data),
+        )
+    ]
+
+    generic = compress_bytes(data)
+    candidates.append(
+        TensorEncoding(
+            mode="generic",
+            codec=generic.codec,
+            transform="none",
+            transform_meta=None,
+            payload=generic.compressed_bytes,
+            raw_size=len(data),
+            stored_size=len(generic.compressed_bytes),
+            sha256=generic.sha256,
+        )
+    )
+
+    best_mosaic = _best_mosaic_encoding(data)
+    if best_mosaic is not None:
+        candidates.append(best_mosaic)
+
+    lattice = _encode_lattice_tensor(data, allow_lattice=True)
+    candidates.append(lattice)
 
     return min(candidates, key=lambda item: item.stored_size)
 
 
 def compress_safetensors_blob(blob: bytes) -> bytes:
     header, header_bytes, body, entries = parse_safetensors_blob(blob)
+    del header
     payload_parts: list[bytes] = []
     manifest_entries: list[TensorEntry] = []
 
@@ -181,13 +359,13 @@ def compress_safetensors_blob(blob: bytes) -> bytes:
                 transform=chosen.transform,
                 transform_meta=chosen.transform_meta,
                 raw_size=chosen.raw_size,
-                stored_size=len(chosen.payload),
+                stored_size=chosen.stored_size,
                 sha256=chosen.sha256,
             )
         )
 
     manifest = TensorShardManifest(
-        version=1,
+        version=2,
         original_header_b64=base64.b64encode(header_bytes).decode("ascii"),
         original_size=len(blob),
         shard_sha256=_sha256(blob),
@@ -240,10 +418,14 @@ def decompress_safetensors_blob(blob: bytes) -> bytes:
 
         if tensor["mode"] == "raw":
             raw = chunk
-        else:
+        elif tensor["mode"] == "generic":
             raw = decompress_bytes(chunk)
-            if tensor["mode"] == "mosaic":
-                raw = mosaic_decode(raw, tensor["transform_meta"])
+        elif tensor["mode"] == "mosaic":
+            raw = mosaic_decode(decompress_bytes(chunk), tensor["transform_meta"])
+        elif tensor["mode"] == "lattice":
+            raw = _decode_lattice_tensor(chunk)
+        else:
+            raise ValueError(f"unknown tensor mode: {tensor['mode']}")
 
         if len(raw) != int(tensor["raw_size"]):
             raise ValueError(f"tensor size mismatch for {tensor['name']}")
@@ -272,27 +454,30 @@ def decompress_safetensors_file(source: Path, target_path: Path) -> Path:
 
 
 def benchmark_tensor_strategies(blob: bytes) -> list[dict[str, Any]]:
-    header, header_bytes, body, entries = parse_safetensors_blob(blob)
-    del header, header_bytes
+    _, _, body, entries = parse_safetensors_blob(blob)
     rows: list[dict[str, Any]] = []
     raw_size = len(blob)
 
     rows.append({"strategy": "raw", "original_bytes": raw_size, "compressed_bytes": raw_size, "ratio": 1.0, "roundtrip_ok": True})
 
-    generic = compress_bytes(blob)
-    rows.append({
-        "strategy": f"whole-file:{generic.codec}",
-        "original_bytes": raw_size,
-        "compressed_bytes": len(generic.compressed_bytes),
-        "ratio": round(raw_size / max(1, len(generic.compressed_bytes)), 4),
-        "roundtrip_ok": decompress_bytes(generic.compressed_bytes) == blob,
-    })
+    whole_file = compress_bytes(blob)
+    rows.append(
+        {
+            "strategy": f"whole-file:{whole_file.codec}",
+            "original_bytes": raw_size,
+            "compressed_bytes": len(whole_file.compressed_bytes),
+            "ratio": round(raw_size / max(1, len(whole_file.compressed_bytes)), 4),
+            "roundtrip_ok": decompress_bytes(whole_file.compressed_bytes) == blob,
+        }
+    )
 
     per_tensor_raw = 0
     per_tensor_generic = 0
     per_tensor_mosaic = 0
-    mosaic_ok = True
+    per_tensor_lattice = 0
     generic_ok = True
+    mosaic_ok = True
+    lattice_ok = True
 
     for entry in entries:
         raw = body[entry.data_offsets[0] : entry.data_offsets[1]]
@@ -302,16 +487,23 @@ def benchmark_tensor_strategies(blob: bytes) -> list[dict[str, Any]]:
         per_tensor_generic += len(generic_best.compressed_bytes)
         generic_ok = generic_ok and decompress_bytes(generic_best.compressed_bytes) == raw
 
-        chosen = _best_tensor_encoding(raw)
-        per_tensor_mosaic += chosen.stored_size
-        if chosen.mode == "mosaic":
-            restored = mosaic_decode(decompress_bytes(chosen.payload), chosen.transform_meta or {})
-        elif chosen.mode == "generic":
-            restored = decompress_bytes(chosen.payload)
+        mosaic_best = _best_mosaic_encoding(raw)
+        if mosaic_best is not None:
+            per_tensor_mosaic += mosaic_best.stored_size
+            restored_mosaic = mosaic_decode(decompress_bytes(mosaic_best.payload), mosaic_best.transform_meta or {})
+            mosaic_ok = mosaic_ok and restored_mosaic == raw
         else:
-            restored = chosen.payload
-        mosaic_ok = mosaic_ok and restored == raw
+            per_tensor_mosaic += len(generic_best.compressed_bytes)
+            mosaic_ok = mosaic_ok and decompress_bytes(generic_best.compressed_bytes) == raw
+
+        lattice_best = _encode_lattice_tensor(raw, allow_lattice=True)
+        per_tensor_lattice += lattice_best.stored_size
+        if lattice_best.mode == "lattice":
+            lattice_ok = lattice_ok and _decode_lattice_tensor(lattice_best.payload) == raw
+        else:
+            lattice_ok = lattice_ok and decompress_bytes(lattice_best.payload) == raw
 
     rows.append({"strategy": "per-tensor generic", "original_bytes": per_tensor_raw, "compressed_bytes": per_tensor_generic, "ratio": round(per_tensor_raw / max(1, per_tensor_generic), 4), "roundtrip_ok": generic_ok})
     rows.append({"strategy": "per-tensor mosaic", "original_bytes": per_tensor_raw, "compressed_bytes": per_tensor_mosaic, "ratio": round(per_tensor_raw / max(1, per_tensor_mosaic), 4), "roundtrip_ok": mosaic_ok})
+    rows.append({"strategy": "per-tensor lattice", "original_bytes": per_tensor_raw, "compressed_bytes": per_tensor_lattice, "ratio": round(per_tensor_raw / max(1, per_tensor_lattice), 4), "roundtrip_ok": lattice_ok})
     return rows
